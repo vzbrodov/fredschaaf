@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+outputs/
+gaia_cache/
+.jupyter/
+.ipython/
+.mplconfig/
+
+# Локальные наблюдательные данные и тестовые изображения.
+*.fits

@@ -1,0 +1,10 @@
+# Reproducible environment for the Fredschaaf astrometry notebooks.
+numpy>=2.1
+scipy>=1.15
+astropy>=7.0
+photutils>=2.2
+pandas>=2.2
+matplotlib>=3.10
+astroquery>=0.4.9
+jupyterlab>=4.3
+ipykernel>=6.29
