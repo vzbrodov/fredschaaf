@@ -5,7 +5,6 @@ astropy>=7.0
 photutils>=2.2
 pandas>=2.2
 matplotlib>=3.10
-requests>=2.32
 astroquery>=0.4.9
 jupyterlab>=4.3
 ipykernel>=6.29
