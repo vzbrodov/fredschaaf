@@ -9,3 +9,7 @@ gaia_cache/
 
 # Локальные наблюдательные данные и тестовые изображения.
 *.fits
+
+# Large reproducible JPL kernels; URLs and checksums are tracked separately.
+/data/assist/*.440
+/data/assist/*.bsp

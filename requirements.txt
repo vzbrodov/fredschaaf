@@ -8,3 +8,5 @@ matplotlib>=3.10
 requests>=2.32
 jupyterlab>=4.3
 ipykernel>=6.29
+rebound>=4.6
+assist>=1.2
