@@ -144,11 +144,11 @@ python3 -m venv .venv
 .venv/bin/python scripts/fit_ground_substacks.py --config configs/20250903_H_alpha.toml \
   --seed-offset-mas 34.82 23.32 --force-groups 4
 .venv/bin/python scripts/run_ground_injection_recovery.py \
-  --config configs/20250902_R.toml
+  --config configs/20250902_R.toml --expected-snrs 4 6 8 12 20 40
 .venv/bin/python scripts/run_ground_injection_recovery.py \
-  --config configs/20250903_R.toml
+  --config configs/20250903_R.toml --expected-snrs 4 6 8 12 20 40
 .venv/bin/python scripts/run_ground_injection_recovery.py \
-  --config configs/20251010_R.toml
+  --config configs/20251010_R.toml --expected-snrs 4 6 8 12 20 40
 .venv/bin/python scripts/build_full_stack_ground_series.py
 .venv/bin/python scripts/build_orbit_ground_series.py
 .venv/bin/python scripts/build_fpr_residuals.py
@@ -230,6 +230,21 @@ Injection-recovery выполнен непосредственно на прин
 `0.987`. Для слабых ночей эти числа подтверждают масштаб odd/even-добавки; для
 лучшей ночи одна из восьми инъекций выходит за формальную 95%-эллипсу, поэтому в
 орбитальном fit сохраняется более осторожная аппульсная ковариация.
+
+Дополнительно построена кривая полноты на расчётных уровнях S/N
+`4, 6, 8, 12, 20, 40`; реальный поток астероида всегда добавляется в сетку
+отдельно. При расчётном S/N `8` прошли критерий обнаружения `0/8` инъекций для
+`20250903_R` и по `1/8` для двух коротких серий. При расчётном S/N `12`
+получено `7/8`, `8/8` и `8/8`. Причина — после внесения в отдельные кадры,
+интерполяции и clipping фактический fitted S/N ниже простого линейного прогноза.
+Поэтому `fitted S/N >= 8` остаётся критерием на уже измеренном стеке, но заранее
+планировать почти полное обнаружение следует ближе к ожидаемому S/N около 12.
+При восьми положениях нижняя 95%-граница Wilson даже для `8/8` равна лишь
+`0.676`; это пока калибровочная диагностика, а не точная функция полноты.
+
+Полные результаты сохраняются в `injection_recovery_<series>.csv`, агрегаты —
+в одноимённых `_summary.csv` и `_summary.json`, а график полноты, позиционного
+RMS и восстановления потока — в `.png` внутри `outputs/`.
 
 Адаптивное деление сохраняется в `outputs/adaptive_substacks_*.csv`. Для
 `20250903_R` получено 12 последовательных подстеков по 7–8 кадров с S/N
