@@ -9,10 +9,19 @@ from fredschaaf_astrometry.series import (
     build_orbit_ground_series,
     fit_series_motion,
     load_ground_series_result,
+    load_series_config,
 )
 
 
 class GroundSeriesTests(unittest.TestCase):
+    def test_series_config_records_missing_calibration_frames(self):
+        path = Path(__file__).resolve().parents[1] / "configs/20250903_R.toml"
+        config = load_series_config(path)
+        self.assertEqual(
+            config.calibration,
+            {"bias": False, "dark": False, "flat": False},
+        )
+
     def test_legacy_result_is_normalized_without_invented_covariance(self):
         content = """quantity,value
 central_utc,2025-09-03T21:21:55.931

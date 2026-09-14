@@ -5,6 +5,12 @@ observatory_code = "217"
 filter = "R"
 expected_frames = 20
 
+[calibration]
+# No independent master calibration frames are available for this data set.
+bias = false
+dark = false
+flat = false
+
 [inputs]
 summary = "../outputs/two_zone_result_20250902_R.csv"
 stacks = "../outputs/two_zone_asteroid_stacks_20250902_R.csv"

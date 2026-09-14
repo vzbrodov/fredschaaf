@@ -45,6 +45,7 @@ class SeriesConfig:
 
     path: Path
     series: dict[str, object]
+    calibration: dict[str, bool]
     inputs: dict[str, Path]
     reduction: dict[str, object]
     ephemeris: dict[str, object]
@@ -67,11 +68,19 @@ def load_series_config(path: str | Path) -> SeriesConfig:
     with config_path.open("rb") as stream:
         raw = tomllib.load(stream)
 
-    for section in ("series", "inputs", "reduction", "ephemeris", "quality"):
+    for section in (
+        "series",
+        "calibration",
+        "inputs",
+        "reduction",
+        "ephemeris",
+        "quality",
+    ):
         if not isinstance(raw.get(section), dict):
             raise ValueError(f"Missing or invalid [{section}] section")
 
     series = dict(raw["series"])
+    calibration = dict(raw["calibration"])
     inputs_raw = dict(raw["inputs"])
     reduction = dict(raw["reduction"])
     ephemeris = dict(raw["ephemeris"])
@@ -81,6 +90,11 @@ def load_series_config(path: str | Path) -> SeriesConfig:
         {"id", "source", "observatory_code", "filter", "expected_frames"},
         "series",
     )
+    _required(calibration, {"bias", "dark", "flat"}, "calibration")
+    if not all(
+        isinstance(calibration[key], bool) for key in ("bias", "dark", "flat")
+    ):
+        raise ValueError("Calibration flags must be booleans")
     _required(inputs_raw, {"summary", "stacks", "frame_quality"}, "inputs")
     _required(
         reduction,
@@ -173,6 +187,7 @@ def load_series_config(path: str | Path) -> SeriesConfig:
     return SeriesConfig(
         path=config_path,
         series=series,
+        calibration=calibration,
         inputs=inputs,
         reduction=reduction,
         ephemeris=ephemeris,

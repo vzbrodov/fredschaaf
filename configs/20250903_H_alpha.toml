@@ -5,6 +5,12 @@ observatory_code = "217"
 filter = "H_alpha"
 expected_frames = 99
 
+[calibration]
+# No independent master calibration frames are available for this data set.
+bias = false
+dark = false
+flat = false
+
 [inputs]
 summary = "../outputs/two_zone_result_20250903_H_alpha.csv"
 stacks = "../outputs/two_zone_asteroid_stacks_20250903_H_alpha.csv"
