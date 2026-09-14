@@ -42,6 +42,10 @@ appulse_source_id = 32637666936447744
 appulse_maximum_offset_px = 3.0
 appulse_min_frame_psf_stars = 3
 appulse_background_order = 1
+# Independent same-night R-series position. H-alpha is evaluated here with
+# signed forced photometry; a displaced maximum from a blind positive search
+# is not promoted to an asteroid detection.
+detection_seed_offset_mas = [34.82, 23.32]
 
 [ephemeris]
 id = "legacy-linear-horizons"

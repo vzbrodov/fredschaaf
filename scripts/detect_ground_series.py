@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import warnings
 from pathlib import Path
+
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/fredschaaf-matplotlib")
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,7 +20,11 @@ from astropy.wcs import FITSFixedWarning
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from fredschaaf_astrometry.detection import build_full_stack_detection
+from fredschaaf_astrometry.detection import (
+    build_full_stack_detection,
+    fit_stack_flux_at_offset,
+)
+from fredschaaf_astrometry.ground import MAS_PER_DEGREE
 from fredschaaf_astrometry.ground_pipeline import reduce_series
 from fredschaaf_astrometry.series import load_series_config
 
@@ -47,6 +54,33 @@ def main() -> None:
     plot_path = args.output_dir / f"full_stack_detection_{series_id}.png"
     split_path = args.output_dir / f"full_stack_split_check_{series_id}.csv"
     sigma = np.sqrt(np.diag(detection.covariance_mas2))
+    blind_candidate_ok = bool(
+        detection.fitted_snr >= 8.0 and not detection.at_search_boundary
+    )
+    seed_mas = config.reduction.get("detection_seed_offset_mas")
+    forced_flux = np.nan
+    forced_flux_error = np.nan
+    forced_snr = np.nan
+    seed_px = None
+    if seed_mas is not None:
+        seed_mas = np.asarray(seed_mas, float)
+        if seed_mas.shape != (2,) or not np.all(np.isfinite(seed_mas)):
+            raise SystemExit("reduction.detection_seed_offset_mas must contain xi, eta")
+        jacobian = np.mean(
+            [
+                products.frame_models[index].coefficients[1:].T
+                for index in detection.frame_indices
+            ],
+            axis=0,
+        )
+        seed_px = np.linalg.solve(jacobian, seed_mas / MAS_PER_DEGREE)
+        forced_flux, forced_flux_error, _ = fit_stack_flux_at_offset(
+            detection.image, detection.psf, seed_px
+        )
+        forced_snr = forced_flux / forced_flux_error
+    detection_ok = bool(
+        blind_candidate_ok if seed_mas is None else forced_snr >= 8.0
+    )
     table = pd.DataFrame([{
         "series_id": series_id,
         "central_utc": Time(detection.reference_jd, format="jd", scale="utc").isot,
@@ -66,9 +100,13 @@ def main() -> None:
         "dx_px": detection.offset_px[0],
         "dy_px": detection.offset_px[1],
         "at_search_boundary": detection.at_search_boundary,
-        "detection_ok": bool(
-            detection.fitted_snr >= 8.0 and not detection.at_search_boundary
-        ),
+        "blind_candidate_ok": blind_candidate_ok,
+        "forced_seed_xi_mas": np.nan if seed_mas is None else seed_mas[0],
+        "forced_seed_eta_mas": np.nan if seed_mas is None else seed_mas[1],
+        "forced_flux": forced_flux,
+        "forced_flux_error": forced_flux_error,
+        "forced_flux_snr": forced_snr,
+        "detection_ok": detection_ok,
     }])
     table.to_csv(table_path, index=False)
     split_rows = []
@@ -117,6 +155,17 @@ def main() -> None:
     )
     axis.plot(center[0], center[1], "+", color="tab:blue", ms=14, mew=2, label="ephemeris")
     axis.plot(fitted[0], fitted[1], "o", mfc="none", mec="tab:red", ms=14, mew=2, label="PSF fit")
+    if seed_px is not None:
+        forced_position = center + seed_px
+        axis.plot(
+            forced_position[0],
+            forced_position[1],
+            "x",
+            color="tab:green",
+            ms=11,
+            mew=2,
+            label=f"forced position (S/N={forced_snr:.2f})",
+        )
     axis.set(title=f"{series_id}: full motion-compensated stack", xlabel="x, px", ylabel="y, px")
     axis.legend()
     fig.tight_layout()

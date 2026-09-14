@@ -34,7 +34,7 @@ def plot_recovery_summary(
 ) -> None:
     """Plot completeness, positional RMS and flux recovery."""
     figure, axes = plt.subplots(1, 3, figsize=(13, 4.2), constrained_layout=True)
-    x = summary_table.expected_snr_scaled
+    x = summary_table.median_fitted_flux_snr
     axes[0].errorbar(
         x,
         summary_table.recovery_fraction,
@@ -48,12 +48,12 @@ def plot_recovery_summary(
         capsize=3,
     )
     axes[0].axvline(minimum_snr, color="0.5", ls="--", lw=1)
-    axes[0].set(xlabel="expected scaled S/N", ylabel="recovery fraction", ylim=(-0.05, 1.05))
+    axes[0].set(xlabel="median measured fitted S/N", ylabel="recovery fraction", ylim=(-0.05, 1.05))
     axes[1].plot(x, summary_table.rms_2d_mas, "o-")
-    axes[1].set(xlabel="expected scaled S/N", ylabel="position RMS, mas")
+    axes[1].set(xlabel="median measured fitted S/N", ylabel="position RMS, mas")
     axes[2].plot(x, summary_table.median_flux_ratio, "o-")
     axes[2].axhline(1.0, color="0.5", ls="--", lw=1)
-    axes[2].set(xlabel="expected scaled S/N", ylabel="median recovered / injected flux")
+    axes[2].set(xlabel="median measured fitted S/N", ylabel="median recovered / injected flux")
     for axis in axes:
         axis.set_xscale("log")
         axis.grid(alpha=0.25)
@@ -227,6 +227,9 @@ def main() -> None:
                 "rms_2d_mas": float(np.sqrt(np.mean(np.sum(errors**2, axis=1)))) if len(valid) else np.nan,
                 "median_flux_ratio": float(valid.flux_ratio.median()) if len(valid) else np.nan,
                 "median_fitted_flux_snr": float(valid.fitted_flux_snr.median()) if len(valid) else np.nan,
+                "snr_transfer_ratio": float(
+                    valid.fitted_flux_snr.median() / (real.fitted_snr * flux_scale)
+                ) if len(valid) else np.nan,
                 "fraction_inside_formal_95pct_ellipse": float(
                     (valid.mahalanobis2 <= 5.991).mean()
                 ) if len(valid) else np.nan,
