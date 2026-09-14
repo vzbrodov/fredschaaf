@@ -30,7 +30,8 @@ def main() -> None:
     args = parser.parse_args()
 
     query = f"""
-SELECT source_id, ra, dec, pmra, pmdec, ref_epoch, phot_g_mean_mag,
+SELECT source_id, ra, dec, pmra, pmdec, parallax, radial_velocity,
+       ref_epoch, phot_g_mean_mag,
        bp_rp, ruwe, duplicated_source
 FROM gaiadr3.gaia_source
 WHERE 1=CONTAINS(

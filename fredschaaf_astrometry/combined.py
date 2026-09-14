@@ -27,6 +27,7 @@ def combine_gaia_and_ground(
     ground_series: pd.DataFrame,
     *,
     assume_zero_missing_ground_cross_covariance: bool = False,
+    include_failed_ground_quality: bool = False,
 ) -> ProjectedAstrometry:
     """Combine Gaia AL residuals and ground ξ/η O-C into one GLS system.
 
@@ -57,6 +58,20 @@ def combine_gaia_and_ground(
         raise ValueError(
             f"Missing Gaia columns: {missing_gaia}; missing ground columns: {missing_ground}"
         )
+
+    if "quality_ok" in ground_series and not include_failed_ground_quality:
+        quality = (
+            ground_series["quality_ok"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .map({"true": True, "false": False})
+        )
+        if quality.isna().any():
+            raise ValueError("Ground quality_ok values must be booleans")
+        failed = ground_series.loc[~quality, "series_id"].astype(str).tolist()
+        if failed:
+            raise ValueError(f"Ground series failed quality checks: {failed}")
 
     values: list[float] = []
     times: list[float] = []
@@ -98,10 +113,11 @@ def combine_gaia_and_ground(
         times.extend([float(row["jd_utc"]), float(row["jd_utc"])])
         projections.extend([(1.0, 0.0), (0.0, 1.0)])
         blocks.append(block)
+        source = str(row.get("source", "ground"))
         for component in ("xi", "eta"):
             labels.append(
                 {
-                    "source": "pulkovo",
+                    "source": source,
                     "observation_id": str(row["series_id"]),
                     "component": component,
                 }

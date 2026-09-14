@@ -40,13 +40,34 @@ def mpc_217_location() -> EarthLocation:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--number", type=int, default=7065)
-    parser.add_argument("--input", type=Path, default=Path("outputs/pulkovo_series.csv"))
-    parser.add_argument("--output", type=Path, default=Path("outputs/pulkovo_series_fpr.csv"))
+    parser.add_argument("--input", type=Path, default=Path("outputs/ground_series.csv"))
+    parser.add_argument("--output", type=Path, default=Path("outputs/ground_series_fpr.csv"))
     parser.add_argument("--planets", type=Path, default=Path("data/assist/linux_p1550p2650.440"))
     parser.add_argument("--asteroids", type=Path, default=Path("data/assist/sb441-n16.bsp"))
+    parser.add_argument(
+        "--include-failed-quality",
+        action="store_true",
+        help="explicitly allow diagnostic processing of failed ground series",
+    )
     args = parser.parse_args()
 
     series = pd.read_csv(args.input)
+    if "quality_ok" in series and not args.include_failed_quality:
+        quality = (
+            series["quality_ok"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .map({"true": True, "false": False})
+        )
+        if quality.isna().any():
+            raise SystemExit("quality_ok must contain booleans")
+        failed = series.loc[~quality, "series_id"].astype(str).tolist()
+        if failed:
+            raise SystemExit(
+                f"Ground series failed quality checks: {failed}; "
+                "use --include-failed-quality only for diagnostics"
+            )
     summary = json.loads(
         Path(f"outputs/gaia_fpr_{args.number}_residual_summary.json").read_text(encoding="utf-8")
     )

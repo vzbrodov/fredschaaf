@@ -1,0 +1,59 @@
+[series]
+id = "20251010_R"
+source = "ground"
+observatory_code = "217"
+filter = "R"
+expected_frames = 10
+
+[inputs]
+summary = "../outputs/two_zone_result_20251010_R.csv"
+stacks = "../outputs/two_zone_asteroid_stacks_20251010_R.csv"
+frame_quality = "../outputs/two_zone_frame_quality_20251010_R.csv"
+
+[reduction]
+frame_glob = "../Fredschaaf/20251010/7065_R_4_*_wcs.fits"
+catalog = "../Fredschaaf/20251010/gaia_dr3_field_g19_5.csv"
+inner_radius_arcmin = 4.0
+outer_radius_arcmin = 10.0
+group_size = 3
+max_inter_frame_gap_minutes = 0.4
+detector_margin_px = 20
+astrometric_mag_min = 5.0
+astrometric_mag_max = 16.5
+distortion_mag_max = 19.5
+star_half_box_px = 10
+stack_half_size_px = 20
+psf_half_size_px = 7
+psf_radius_arcmin = 8.0
+psf_mag_min = 14.5
+psf_mag_max = 16.5
+affine_clip_iterations = 4
+affine_clip_sigma = 3.0
+affine_min_stars = 6
+affine_min_clip_radius_mas = 100.0
+frame_rejection_sigma = 3.0
+psf_aperture_radius_px = 5.5
+psf_min_flux = 5000.0
+psf_saturation_level = 50000.0
+psf_fit_max_offset_px = 5.0
+psf_clip_sigma = 3.0
+stack_clip_sigma = 3.0
+background_clip_sigma = 3.0
+
+[ephemeris]
+# Gaia FPR/ASSIST orbit evaluated topocentrically for MPC 217. The former
+# rounded telescope pointing was 5.7 arcsec away and had an incorrect zero rate.
+id = "gaia-fpr-refit-assist-de440-de441-linearized"
+reference_utc = "2025-10-10T20:55:54.243"
+ra_deg = 42.07689960631545
+dec_deg = 13.058008995005192
+ra_rate_arcsec_per_hour = -22.6714359214
+dec_rate_arcsec_per_hour = -15.1981223140
+
+[quality]
+# Four small stacks test detection only; precision-series thresholds still apply.
+min_stacks = 3
+min_frames_per_stack = 1
+min_median_stack_snr = 8.0
+max_rejected_fraction = 0.25
+max_adjusted_rms_mas = 100.0

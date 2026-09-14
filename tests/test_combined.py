@@ -37,6 +37,7 @@ class CombinedAstrometryTests(unittest.TestCase):
             result.covariance_mas2,
             [[0.25, 0.0, 0.0], [0.0, 100.0, 20.0], [0.0, 20.0, 64.0]],
         )
+        self.assertEqual(result.index.loc[1, "source"], "ground")
 
     def test_missing_ground_cross_covariance_requires_explicit_assumption(self):
         ground = self.ground.copy()
@@ -49,6 +50,15 @@ class CombinedAstrometryTests(unittest.TestCase):
             assume_zero_missing_ground_cross_covariance=True,
         )
         self.assertEqual(result.covariance_mas2[1, 2], 0.0)
+
+    def test_failed_ground_quality_requires_explicit_override(self):
+        ground = self.ground.assign(quality_ok=False)
+        with self.assertRaisesRegex(ValueError, "failed quality checks"):
+            combine_gaia_and_ground(self.gaia, ground)
+        result = combine_gaia_and_ground(
+            self.gaia, ground, include_failed_ground_quality=True
+        )
+        self.assertEqual(len(result.values_mas), 3)
 
 
 if __name__ == "__main__":
