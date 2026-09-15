@@ -20,7 +20,7 @@ from .ground import (
     linear_ephemeris_coordinates,
     mpc_217_location,
     normalized_star_stamp,
-    propagate_gaia_linear_motion,
+    propagate_gaia_astrometry,
     tangent_plane,
 )
 from .ground_pipeline import ReductionProducts
@@ -242,6 +242,10 @@ def fit_appulse_trajectory(
     radius = float(config.reduction["psf_aperture_radius_px"])
     maximum_offset = float(config.reduction.get("appulse_maximum_offset_px", 3.0))
     background_order = int(config.reduction.get("appulse_background_order", 0))
+    fit_loss = str(config.reduction.get("appulse_fit_loss", "soft_l1"))
+    if fit_loss not in {"linear", "soft_l1"}:
+        raise ValueError("appulse_fit_loss must be 'linear' or 'soft_l1'")
+    observer_location = mpc_217_location()
     frame_to_psf = {}
     for group in products.stack_groups:
         for frame_index in group.frame_indices:
@@ -283,7 +287,9 @@ def fit_appulse_trajectory(
             maximum_offset_px=maximum_offset,
         )
         star_xy = np.array([star_ix + star_dx, star_iy + star_dy])
-        epoch_star = propagate_gaia_linear_motion(catalog_row, model.time).iloc[0]
+        epoch_star = propagate_gaia_astrometry(
+            catalog_row, model.time, observer_location=observer_location
+        ).iloc[0]
         star_tangent = tangent_plane(
             [epoch_star.ra_epoch],
             [epoch_star.dec_epoch],
@@ -435,7 +441,7 @@ def fit_appulse_trajectory(
             [position_bound, position_bound, 200.0, 200.0],
         ),
         x_scale=[100.0, 100.0, 10.0, 10.0],
-        loss="soft_l1",
+        loss=fit_loss,
         f_scale=1.0,
         max_nfev=300,
     )
@@ -475,7 +481,7 @@ def fit_appulse_trajectory(
                 [position_bound, position_bound, 200.0, 200.0],
             ),
             x_scale=[100.0, 100.0, 10.0, 10.0],
-            loss="soft_l1",
+            loss=fit_loss,
             f_scale=1.0,
             max_nfev=150,
         )
@@ -499,7 +505,9 @@ def fit_appulse_trajectory(
         ra_rate_arcsec_per_hour=float(config.ephemeris["ra_rate_arcsec_per_hour"]),
         dec_rate_arcsec_per_hour=float(config.ephemeris["dec_rate_arcsec_per_hour"]),
     )
-    central_event = propagate_gaia_linear_motion(catalog_row, central_time).iloc[0]
+    central_event = propagate_gaia_astrometry(
+        catalog_row, central_time, observer_location=observer_location
+    ).iloc[0]
     central_asteroid = tangent_plane(
         [central_ra],
         [central_dec],

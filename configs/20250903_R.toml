@@ -48,6 +48,7 @@ appulse_source_id = 32637666936447744
 appulse_check_source_ids = [32637666936447488]
 appulse_maximum_offset_px = 3.0
 appulse_min_frame_psf_stars = 3
+appulse_fit_loss = "linear"
 
 [ephemeris]
 id = "legacy-linear-horizons"
@@ -65,3 +66,4 @@ min_median_stack_snr = 8.0
 max_rejected_fraction = 0.25
 max_adjusted_rms_mas = 100.0
 max_appulse_psf_model_difference_mas = 50.0
+max_appulse_fit_loss_difference_mas = 20.0

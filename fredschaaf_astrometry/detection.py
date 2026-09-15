@@ -223,6 +223,9 @@ def build_full_stack_detection(
         int(config.reduction["psf_half_size_px"]), 2
     ):
         raise ValueError("stack half-size must contain the shifted PSF search region")
+    shift_order = int(config.reduction.get("stack_shift_order", 1))
+    if shift_order < 0 or shift_order > 5:
+        raise ValueError("stack_shift_order must be between 0 and 5")
     frame_to_psf = {}
     for group in products.stack_groups:
         if group.psf is None:
@@ -276,10 +279,10 @@ def build_full_stack_detection(
             image_shift(
                 prepared,
                 (-(asteroid_xy[1] - iy), -(asteroid_xy[0] - ix)),
-                order=1,
+                order=shift_order,
                 mode="constant",
                 cval=np.nan,
-                prefilter=False,
+                prefilter=shift_order > 1,
             )
         )
     if len(cutouts) != len(accepted):

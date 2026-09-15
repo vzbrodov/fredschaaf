@@ -48,6 +48,11 @@ def main() -> None:
         action="store_true",
         help="Skip leave-one-stack-out fits for a quick low-S/N diagnostic",
     )
+    parser.add_argument(
+        "--skip-loss-comparison",
+        action="store_true",
+        help="Skip the primary-star linear/robust fit comparison",
+    )
     args = parser.parse_args()
     config = load_series_config(args.config)
     source_ids = args.event_source_id or [
@@ -66,6 +71,7 @@ def main() -> None:
     jackknife_path = args.output_dir / f"appulse_jackknife_{series_id}.csv"
     systematics_path = args.output_dir / f"appulse_systematics_{series_id}.csv"
     psf_comparison_path = args.output_dir / f"appulse_psf_comparison_{series_id}.csv"
+    loss_comparison_path = args.output_dir / f"appulse_loss_comparison_{series_id}.csv"
     summary_path = args.output_dir / f"appulse_result_{series_id}.csv"
     ground_path = args.output_dir / f"ground_appulse_series_{series_id}.csv"
     summaries = []
@@ -127,27 +133,61 @@ def main() -> None:
     summary = pd.DataFrame(summaries)
     comparison_rows = []
     if not args.skip_group_psf_comparison:
-        group_fit = fit_appulse_trajectory(
-            products,
-            config,
-            catalog,
-            event_source_id=source_ids[0],
-            psf_mode="group",
-            compute_jackknife=False,
-        )
-        frame_row = summary.loc[summary.event_source_id == source_ids[0]].iloc[0]
-        comparison_rows = [
-            {
-                "event_source_id": source_ids[0],
+        for source_id in source_ids:
+            group_fit = fit_appulse_trajectory(
+                products,
+                config,
+                catalog,
+                event_source_id=source_id,
+                psf_mode="group",
+                compute_jackknife=False,
+            )
+            frame_row = summary.loc[summary.event_source_id == source_id].iloc[0]
+            delta = frame_row[["oc_xi_mas", "oc_eta_mas"]].to_numpy(float) - (
+                group_fit.position_mas
+            )
+            comparison_rows.append({
+                "event_source_id": source_id,
                 "frame_psf_xi_mas": frame_row.oc_xi_mas,
                 "frame_psf_eta_mas": frame_row.oc_eta_mas,
                 "group_psf_xi_mas": group_fit.position_mas[0],
                 "group_psf_eta_mas": group_fit.position_mas[1],
-                "difference_xi_mas": frame_row.oc_xi_mas - group_fit.position_mas[0],
-                "difference_eta_mas": frame_row.oc_eta_mas - group_fit.position_mas[1],
-                "difference_2d_mas": float(
-                    np.hypot(*(frame_row[["oc_xi_mas", "oc_eta_mas"]].to_numpy(float) - group_fit.position_mas))
-                ),
+                "difference_xi_mas": delta[0],
+                "difference_eta_mas": delta[1],
+                "difference_2d_mas": float(np.hypot(*delta)),
+            })
+    loss_comparison_rows = []
+    if not args.skip_loss_comparison:
+        selected_loss = str(config.reduction.get("appulse_fit_loss", "soft_l1"))
+        alternate_loss = "soft_l1" if selected_loss == "linear" else "linear"
+        config.reduction["appulse_fit_loss"] = alternate_loss
+        try:
+            alternate_fit = fit_appulse_trajectory(
+                products,
+                config,
+                catalog,
+                event_source_id=source_ids[0],
+                psf_mode="frame",
+                compute_jackknife=False,
+            )
+        finally:
+            config.reduction["appulse_fit_loss"] = selected_loss
+        frame_row = summary.loc[summary.event_source_id == source_ids[0]].iloc[0]
+        loss_delta = frame_row[["oc_xi_mas", "oc_eta_mas"]].to_numpy(float) - (
+            alternate_fit.position_mas
+        )
+        loss_comparison_rows = [
+            {
+                "event_source_id": source_ids[0],
+                "selected_loss": selected_loss,
+                "alternate_loss": alternate_loss,
+                "selected_xi_mas": frame_row.oc_xi_mas,
+                "selected_eta_mas": frame_row.oc_eta_mas,
+                "alternate_xi_mas": alternate_fit.position_mas[0],
+                "alternate_eta_mas": alternate_fit.position_mas[1],
+                "difference_xi_mas": loss_delta[0],
+                "difference_eta_mas": loss_delta[1],
+                "difference_2d_mas": float(np.hypot(*loss_delta)),
             }
         ]
     primary = summary.iloc[0]
@@ -168,6 +208,15 @@ def main() -> None:
     covariance = formal_covariance.copy()
     if np.all(np.isfinite(psf_model_delta)):
         covariance += np.outer(psf_model_delta, psf_model_delta)
+    fit_loss_delta = np.array([np.nan, np.nan])
+    if loss_comparison_rows:
+        fit_loss_delta = np.array(
+            [
+                loss_comparison_rows[0]["difference_xi_mas"],
+                loss_comparison_rows[0]["difference_eta_mas"],
+            ]
+        )
+        covariance += np.outer(fit_loss_delta, fit_loss_delta)
     central_time = Time(primary.central_utc, scale="utc")
     ephemeris_ra, ephemeris_dec = linear_ephemeris_coordinates(
         central_time,
@@ -194,10 +243,16 @@ def main() -> None:
         )) if len(summary) > 1 else np.nan
     )
     psf_model_difference = float(np.hypot(*psf_model_delta))
+    fit_loss_difference = float(np.hypot(*fit_loss_delta))
     psf_model_ok = (
         not np.isfinite(psf_model_difference)
         or psf_model_difference
         <= float(config.quality.get("max_appulse_psf_model_difference_mas", 50.0))
+    )
+    fit_loss_ok = (
+        not np.isfinite(fit_loss_difference)
+        or fit_loss_difference
+        <= float(config.quality.get("max_appulse_fit_loss_difference_mas", 20.0))
     )
     ground = pd.DataFrame([{
         "source": "ground_appulse",
@@ -214,23 +269,26 @@ def main() -> None:
         "cov_xi_eta_mas2": covariance[0, 1],
         "cov_eta_eta_mas2": covariance[1, 1],
         "ephemeris_id": str(config.ephemeris["id"]),
-        "covariance_method": "joint-pixel-forward-fit-formal+psf-model-spread",
+        "covariance_method": "joint-pixel-forward-fit-formal+psf-model+fit-loss-spread",
         "event_source_id": int(primary.event_source_id),
         "event_separation_arcsec": primary.event_separation_arcsec,
         "reference_check_difference_mas": reference_difference,
         "combined_fitted_flux_snr": primary.combined_fitted_flux_snr,
         "psf_model_difference_mas": psf_model_difference,
+        "fit_loss_difference_mas": fit_loss_difference,
         "quality_ok": bool(
             primary.combined_fitted_flux_snr >= float(config.quality["min_median_stack_snr"])
             and primary.boundary_frames == 0
             and (not np.isfinite(reference_difference) or reference_difference <= 50.0)
             and psf_model_ok
+            and fit_loss_ok
         ),
         "quality_flags": "ok" if (
             primary.combined_fitted_flux_snr >= float(config.quality["min_median_stack_snr"])
             and primary.boundary_frames == 0
             and (not np.isfinite(reference_difference) or reference_difference <= 50.0)
             and psf_model_ok
+            and fit_loss_ok
         ) else "appulse_validation_failed",
     }])
     pd.concat(diagnostics, ignore_index=True).to_csv(diagnostics_path, index=False)
@@ -238,12 +296,14 @@ def main() -> None:
     pd.concat(jackknives, ignore_index=True).to_csv(jackknife_path, index=False)
     pd.concat(systematics, ignore_index=True).to_csv(systematics_path, index=False)
     pd.DataFrame(comparison_rows).to_csv(psf_comparison_path, index=False)
+    pd.DataFrame(loss_comparison_rows).to_csv(loss_comparison_path, index=False)
     summary.to_csv(summary_path, index=False)
     ground.to_csv(ground_path, index=False)
     print(summary.to_string(index=False))
     print(
         f"Saved {summary_path}, {diagnostics_path}, {pseudo_path}, "
-        f"{jackknife_path}, {systematics_path}, {psf_comparison_path}, and {ground_path}"
+        f"{jackknife_path}, {systematics_path}, {psf_comparison_path}, "
+        f"{loss_comparison_path}, and {ground_path}"
     )
 
 

@@ -23,9 +23,10 @@ from .ground import (
     fit_gaussian_centroid,
     inverse_tangent_plane,
     linear_ephemeris_coordinates,
+    mpc_217_location,
     normalized_star_stamp,
     pixel_offset_to_mas,
-    propagate_gaia_linear_motion,
+    propagate_gaia_astrometry,
     read_fits_frame,
     robust_upper_limit,
     tangent_plane,
@@ -150,12 +151,15 @@ def _reduce_frames(
     quality_rows = []
     control_rows = []
     distortion_rows = []
+    observer_location = mpc_217_location()
 
     for frame_number, path in enumerate(paths):
         image, header = read_fits_frame(path)
         time = exposure_middle_time(header)
         wcs = WCS(header)
-        epoch_catalog = propagate_gaia_linear_motion(catalog, time)
+        epoch_catalog = propagate_gaia_astrometry(
+            catalog, time, observer_location=observer_location
+        )
         asteroid_ra, asteroid_dec = _ephemeris(config, time)
         predicted = wcs.all_world2pix(
             epoch_catalog[["ra_epoch", "dec_epoch"]].to_numpy(), 0
@@ -273,7 +277,9 @@ def _reduce_frames(
                 )
             )
 
-        faint = propagate_gaia_linear_motion(extra_catalog, time)
+        faint = propagate_gaia_astrometry(
+            extra_catalog, time, observer_location=observer_location
+        )
         faint_predicted = wcs.all_world2pix(faint[["ra_epoch", "dec_epoch"]].to_numpy(), 0)
         faint_indices = np.where(_inside_detector(faint_predicted, image.shape, margin))[0]
         faint_measured = _measure_centroids(

@@ -76,11 +76,14 @@ def propagate_gaia_astrometry(
 ) -> pd.DataFrame:
     """Propagate Gaia astrometry, with a safe proper-motion-only fallback.
 
-    Rows with a finite positive parallax use Astropy 3D space motion. A finite
-    radial velocity adds perspective acceleration; otherwise zero radial
-    velocity is used. When ``observer_location`` is supplied, the differential
-    finite-distance GCRS displacement is added as annual/topocentric parallax.
-    Rows without a usable parallax retain the explicit linear Gaia model.
+    Rows with a finite positive parallax and a physically plausible implied
+    tangential speed use Astropy 3D space motion. A finite radial velocity adds
+    perspective acceleration; otherwise zero radial velocity is used. When
+    ``observer_location`` is supplied, the differential finite-distance GCRS
+    displacement is added as annual/topocentric parallax. Rows without a usable
+    parallax retain the explicit linear Gaia model. The generous 3000 km/s
+    ceiling prevents noisy near-zero parallaxes from producing an unphysical
+    distance/velocity pair inside ERFA; their parallax is negligible here.
     """
     required = {"ra", "dec", "pmra", "pmdec", "ref_epoch"}
     missing = sorted(required.difference(catalog.columns))
@@ -96,7 +99,18 @@ def propagate_gaia_astrometry(
     if "parallax" not in result:
         return result
     parallax = pd.to_numeric(result["parallax"], errors="coerce").to_numpy(float)
-    full = np.isfinite(parallax) & (parallax > 0)
+    total_proper_motion = np.hypot(
+        pd.to_numeric(result["pmra"], errors="coerce").to_numpy(float),
+        pd.to_numeric(result["pmdec"], errors="coerce").to_numpy(float),
+    )
+    with np.errstate(divide="ignore", invalid="ignore"):
+        tangential_speed_kms = 4.74047 * total_proper_motion / parallax
+    full = (
+        np.isfinite(parallax)
+        & (parallax > 0)
+        & np.isfinite(tangential_speed_kms)
+        & (tangential_speed_kms < 3000.0)
+    )
     if not np.any(full):
         return result
     radial_velocity = np.zeros(len(result), dtype=float)

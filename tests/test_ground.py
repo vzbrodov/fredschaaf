@@ -71,13 +71,13 @@ class GroundMeasurementTests(unittest.TestCase):
     def test_gaia_space_motion_parallax_and_linear_fallback(self):
         catalog = pd.DataFrame(
             {
-                "ra": [43.1, 43.2],
-                "dec": [15.2, 15.3],
-                "pmra": [100.0, 20.0],
-                "pmdec": [-50.0, 10.0],
-                "parallax": [100.0, np.nan],
-                "radial_velocity": [30.0, np.nan],
-                "ref_epoch": [2016.0, 2016.0],
+                "ra": [43.1, 43.2, 43.3],
+                "dec": [15.2, 15.3, 15.4],
+                "pmra": [100.0, 20.0, 100.0],
+                "pmdec": [-50.0, 10.0, 100.0],
+                "parallax": [100.0, np.nan, 0.001],
+                "radial_velocity": [30.0, np.nan, np.nan],
+                "ref_epoch": [2016.0, 2016.0, 2016.0],
             }
         )
         epoch = Time("2025-09-03T21:21:00", scale="utc")
@@ -91,6 +91,9 @@ class GroundMeasurementTests(unittest.TestCase):
         )
         self.assertEqual(
             topocentric.loc[1, "gaia_propagation"], "linear_proper_motion"
+        )
+        self.assertEqual(
+            topocentric.loc[2, "gaia_propagation"], "linear_proper_motion"
         )
         parallax_shift_mas = np.hypot(
             (topocentric.loc[0, "ra_epoch"] - barycentric.loc[0, "ra_epoch"])
